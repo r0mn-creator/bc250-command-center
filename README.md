@@ -50,32 +50,51 @@ keeping the change, and automatically reverts if that test fails.
   installer detects which one you have and layers packages accordingly;
   immutable/ostree images are supported).
 
-## Install
+## Getting started
 
+Five steps, download to running app:
+
+**1. Download it.** Go to the
+[Releases page](https://github.com/r0mn-creator/bc250-command-center/releases/latest)
+and download `bc250-command-center-vX.Y.Z.zip` (the `.tar.gz` next to it has
+the same contents, pick whichever your system opens by default).
+
+**2. Extract it.** Right-click the downloaded file and choose **Extract**,
+or in a terminal:
 ```
-git clone https://github.com/r0mn-creator/bc250-command-center.git
-cd bc250-command-center
+unzip bc250-command-center-v1.0.0.zip
+cd bc250-command-center-v1.0.0
+```
+
+**3. Install it.** From a terminal, inside that folder:
+```
 ./install.sh
 ```
+This asks for your password once, to set up the few system pieces the app
+needs (like the root-only helper scripts each unlock/overclock action
+calls). It's safe to re-run any time — it detects what's already in place
+and skips it, whether this is a fresh, never-unlocked BC-250 or one that's
+already partially set up.
 
-The installer asks for your password (needed to install system packages and
-set up root-only helper scripts) and is safe to re-run any time — it
-detects what's already in place and skips it. Works on a fresh,
-never-unlocked BC-250 as well as one that's already partially set up.
-
-## Run
-
-Launch **BC-250 Command Center** from your application menu, or directly:
-
+**4. Launch it.** Look for **BC-250 Command Center** in your application
+menu — the installer adds it automatically. Or, from the same terminal:
 ```
 venv/bin/python3 desktop.py
 ```
 
-Every action that changes system state (an unlock, an overclock, a clock
+**5. Click past the disclaimer.** Every launch shows a one-time risk
+summary first. Click **I understand — proceed**, enter your password when
+asked (needed once per launch, to show live GPU status), and the dashboard
+is ready to use.
+
+That's it — no other setup needed. Prefer `git` over downloading a zip?
+`git clone https://github.com/r0mn-creator/bc250-command-center.git` works
+the same way; just run `./install.sh` from inside the cloned folder instead
+of an extracted one.
+
+Every action that *changes* something (an unlock, an overclock, a clock
 change) asks for your password separately, right when you take that action
-— the app itself never runs as root. Reading live GPU compute-unit status
-also needs root, so it'll ask once, right after you click past the initial
-risk disclaimer.
+— the app itself never runs as root.
 
 ## A note on risk
 
