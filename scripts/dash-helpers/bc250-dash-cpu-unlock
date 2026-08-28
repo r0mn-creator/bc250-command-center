@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# Root-only helper for the BC-250 dashboard: manually trigger the CPU core
+# unlock write. Unlike the boot-time bc250-auto-unlock.sh, this does NOT
+# auto-reboot - a GUI button silently rebooting the machine would be a nasty
+# surprise. It just does the register write and reports whether a reboot is
+# needed to see it take effect.
+set -euo pipefail
+
+CONF="/etc/bc250-dashboard.conf"
+[ -f "$CONF" ] || { echo "ERROR: $CONF not found - run install.sh first" >&2; exit 1; }
+source "$CONF"
+
+UNLOCK_SCRIPT="${PREFIX}/bc250-unlock-cores.py"
+EXPECTED="${EXPECTED_CPUS:-16}"
+
+if [ "$(id -u)" != "0" ]; then
+    echo "ERROR: must run as root" >&2
+    exit 1
+fi
+
+current_cpus="$(nproc)"
+if [ "$current_cpus" -ge "$EXPECTED" ]; then
+    echo "STATUS: already unlocked ($current_cpus CPUs online)"
+    exit 0
+fi
+
+echo "STATUS: $current_cpus CPUs online, expected $EXPECTED - unlocking"
+if [ -n "${GOVERNOR_SERVICE:-}" ]; then
+    systemctl stop "$GOVERNOR_SERVICE"
+fi
+set +e
+python3 "$UNLOCK_SCRIPT"
+unlock_status=$?
+set -e
+if [ -n "${GOVERNOR_SERVICE:-}" ]; then
+    systemctl start "$GOVERNOR_SERVICE"
+fi
+
+if [ "$unlock_status" -ne 0 ]; then
+    echo "ERROR: unlock script exited $unlock_status" >&2
+    exit 1
+fi
+
+echo "STATUS: write succeeded - REBOOT REQUIRED to see all $EXPECTED CPUs"

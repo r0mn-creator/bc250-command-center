@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Root-only helper for the BC-250 dashboard: GPU clock/voltage auto-search.
+# Thin wrapper around gpu-autooc.py, filling in machine-specific paths from
+# /etc/bc250-dashboard.conf.
+set -euo pipefail
+
+CONF_FILE="/etc/bc250-dashboard.conf"
+[ -f "$CONF_FILE" ] || { echo "ERROR: $CONF_FILE not found - run install.sh first" >&2; exit 1; }
+source "$CONF_FILE"
+
+if [ "$(id -u)" != "0" ]; then
+    echo "ERROR: must run as root" >&2
+    exit 1
+fi
+
+if [ -z "${GOVERNOR_SERVICE:-}" ]; then
+    echo "ERROR: no governor service was detected at install time" >&2
+    exit 1
+fi
+
+exec python3 "${PREFIX}/gpu-autooc.py" \
+    --oberon-conf "${OBERON_CONF:-/etc/oberon-config.yaml}" \
+    --governor-service "$GOVERNOR_SERVICE" \
+    --verify-script "${PREFIX}/bc250-compute-verify.sh" \
+    "$@"

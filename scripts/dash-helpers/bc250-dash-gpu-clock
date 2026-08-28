@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# Root-only helper for the BC-250 dashboard: set the GPU clock/voltage cap
+# and apply it immediately. Validates against the hardware's own documented
+# OD_RANGE (1000-2000MHz driver-exposed range; 700-1129mV) as a sanity check
+# only - it does NOT know what's actually thermally safe, that's on the
+# dashboard/user, same as editing the config file by hand.
+set -euo pipefail
+
+CONF_FILE="/etc/bc250-dashboard.conf"
+[ -f "$CONF_FILE" ] || { echo "ERROR: $CONF_FILE not found - run install.sh first" >&2; exit 1; }
+source "$CONF_FILE"
+
+CONF="${OBERON_CONF:-/etc/oberon-config.yaml}"
+
+if [ "$(id -u)" != "0" ]; then
+    echo "ERROR: must run as root" >&2
+    exit 1
+fi
+
+if [ -z "${GOVERNOR_SERVICE:-}" ]; then
+    echo "ERROR: no governor service was detected at install time - clock/voltage" >&2
+    echo "control isn't available on this system. See $CONF_FILE." >&2
+    exit 1
+fi
+
+mhz="${1:-}"
+mv="${2:-}"
+
+if ! [[ "$mhz" =~ ^[0-9]+$ ]] || [ "$mhz" -lt 1000 ] || [ "$mhz" -gt 2175 ]; then
+    echo "ERROR: frequency must be an integer MHz between 1000 and 2175, got '$mhz'" >&2
+    exit 2
+fi
+if ! [[ "$mv" =~ ^[0-9]+$ ]] || [ "$mv" -lt 700 ] || [ "$mv" -gt 1129 ]; then
+    echo "ERROR: voltage must be an integer mV between 700 and 1129, got '$mv'" >&2
+    exit 2
+fi
+
+cat > "$CONF" <<EOF
+opps:
+  - frequency:
+    - min: 1000
+    - max: $mhz
+  - voltage:
+    - min: 700
+    - max: $mv
+EOF
+
+systemctl restart "$GOVERNOR_SERVICE"
+echo "STATUS: governor cap set to ${mhz}MHz/${mv}mV and applied"

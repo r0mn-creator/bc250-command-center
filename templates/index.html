@@ -1,0 +1,656 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>BC-250 Command Center</title>
+<style>
+  :root {
+    --bg: #0e0f14; --bg-grad: #14161f; --panel: #191b24; --panel-2: #1f222d;
+    --border: #2a2d3a; --border-soft: #22242f; --text: #eef0f5; --muted: #8b90a3;
+    --muted-2: #666b7d; --safe: #3ecf8e; --warn: #e3ab3d; --hot: #ef5b52;
+    --accent: #6d8cff; --accent-dim: #3d4a8a;
+    --radius: 12px; --radius-sm: 8px;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.28);
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    background: radial-gradient(120% 140% at 15% 0%, var(--bg-grad) 0%, var(--bg) 55%);
+    color: var(--text); font-family: -apple-system, "SF Pro Text", "Segoe UI", "Inter", sans-serif;
+    margin: 0; padding: 1.1rem 1.4rem; display: flex; flex-direction: column;
+    overflow: hidden; -webkit-font-smoothing: antialiased;
+  }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 999px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--muted-2); }
+
+  h1 { font-size: 1.2rem; margin: 0; font-weight: 700; letter-spacing: -0.01em; }
+  .subtitle { color: var(--muted); font-size: 0.78rem; margin-bottom: 0.9rem; }
+  .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.15rem; }
+  .brand { display: flex; align-items: center; gap: 0.6rem; }
+  .brand .dot {
+    width: 9px; height: 9px; border-radius: 50%; background: var(--safe);
+    box-shadow: 0 0 0 3px rgba(62,207,142,0.15);
+  }
+
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; flex: 1; min-height: 0; }
+  .card {
+    background: linear-gradient(180deg, var(--panel-2) 0%, var(--panel) 100%);
+    border: 1px solid var(--border-soft); border-radius: var(--radius);
+    padding: 1rem 1.05rem; display: flex; flex-direction: column; min-height: 0; overflow: hidden;
+    box-shadow: var(--shadow);
+  }
+  .card h2 {
+    font-size: 0.72rem; margin: 0 0 0.65rem 0; display: flex; align-items: center; gap: 0.45rem;
+    text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); font-weight: 700;
+  }
+  .card h2::before {
+    content: ''; width: 5px; height: 5px; border-radius: 50%; background: var(--accent);
+    box-shadow: 0 0 0 2px rgba(109,140,255,0.18);
+  }
+  .divider { height: 1px; background: var(--border-soft); margin: 0.7rem 0; border: none; }
+
+  .row { display: flex; justify-content: space-between; align-items: center; padding: 0.15rem 0; gap: 0.5rem; }
+  .stat { font-size: 1.4rem; font-weight: 700; line-height: 1.2; letter-spacing: -0.01em; }
+  .label { color: var(--muted); font-size: 0.71rem; line-height: 1.35; }
+
+  .pill {
+    display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.18rem 0.55rem;
+    border-radius: 999px; font-size: 0.66rem; font-weight: 700; white-space: nowrap;
+    letter-spacing: 0.01em;
+  }
+  .pill::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+  .pill.safe { background: rgba(62,207,142,0.13); color: var(--safe); }
+  .pill.untested { background: rgba(227,171,61,0.13); color: var(--warn); }
+  .pill.hot { background: rgba(239,91,82,0.13); color: var(--hot); }
+
+  button {
+    background: var(--accent); color: white; border: none; border-radius: var(--radius-sm);
+    padding: 0.45rem 0.8rem; font-size: 0.74rem; cursor: pointer; font-weight: 600;
+    transition: filter 0.12s ease, transform 0.06s ease; letter-spacing: 0.01em;
+  }
+  button:hover { filter: brightness(1.12); }
+  button:active { transform: translateY(1px); }
+  button.secondary { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); }
+  button.secondary:hover { border-color: var(--muted-2); filter: none; }
+  button:disabled { opacity: 0.45; cursor: not-allowed; filter: none; }
+  button.danger { background: var(--hot); }
+  .btn-row { display: flex; gap: 0.45rem; flex-wrap: wrap; margin-top: 0.55rem; align-items: center; }
+
+  input[type=number] {
+    background: var(--bg); border: 1px solid var(--border); color: var(--text);
+    border-radius: 6px; padding: 0.35rem 0.5rem; font-size: 0.9rem; font-weight: 600;
+    font-family: inherit;
+  }
+  input[type=number]:focus { outline: none; border-color: var(--accent); }
+  .field-row { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; margin-top: 0.6rem; }
+  .field-group { display: flex; flex-direction: column; gap: 0.25rem; }
+  .field-group .label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.04em; }
+
+  .preset {
+    border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.55rem 0.7rem;
+    cursor: pointer; transition: border-color 0.12s ease, background 0.12s ease;
+    border-left: 3px solid var(--border);
+  }
+  .preset:hover { border-color: var(--muted-2); border-left-color: var(--accent); }
+  .preset.current { border-left-color: var(--accent); background: rgba(109,140,255,0.06); }
+  .preset-label { font-weight: 600; margin-bottom: 0.15rem; font-size: 0.78rem; display: flex; align-items: center; gap: 0.4rem; }
+  .preset-note { color: var(--muted); font-size: 0.69rem; line-height: 1.4; }
+  .presets { display: flex; flex-direction: column; gap: 0.45rem; margin-top: 0.55rem; overflow-y: auto; min-height: 0; }
+
+  .status-msg {
+    display: flex; align-items: center; gap: 0.4rem; margin-top: 0.55rem;
+    font-size: 0.75rem; font-weight: 600; min-height: 1.3em;
+  }
+  .status-msg.ok { color: var(--safe); }
+  .status-msg.err { color: var(--hot); }
+  .status-msg.busy { color: var(--muted); font-weight: 500; }
+
+  .cu-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; margin-top: 0.55rem; max-width: 220px; }
+  .cu-cell { aspect-ratio: 1; border-radius: 4px; background: var(--panel-2); border: 1px solid var(--border-soft); }
+  .cu-cell.on { background: var(--safe); border-color: var(--safe); box-shadow: 0 0 8px rgba(62,207,142,0.35); }
+
+  .spinner { display: inline-block; width: 12px; height: 12px; border: 2px solid var(--border);
+    border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  #gate {
+    position: fixed; inset: 0; background: rgba(6,7,10,0.88); backdrop-filter: blur(6px);
+    z-index: 100; display: flex; align-items: center; justify-content: center; padding: 2rem;
+  }
+  #gate .box {
+    max-width: 480px; background: var(--panel-2); border: 1px solid var(--hot);
+    border-radius: 16px; padding: 1.9rem; text-align: center; box-shadow: var(--shadow);
+  }
+  #gate h2 { margin: 0 0 0.85rem 0; color: var(--hot); font-size: 1.15rem; font-weight: 700; }
+  #gate p { color: var(--text); font-size: 0.85rem; line-height: 1.55; margin: 0 0 0.6rem 0; }
+  #gate .fine { color: var(--muted); font-size: 0.74rem; }
+  #gate button { margin-top: 1.1rem; padding: 0.6rem 1.6rem; font-size: 0.88rem; background: var(--hot); border-radius: var(--radius-sm); }
+  body.gated .grid, body.gated h1, body.gated .subtitle, body.gated .topbar { visibility: hidden; }
+</style>
+</head>
+<body class="gated">
+<div id="gate">
+  <div class="box">
+    <h2>⚠ Proceed at your own risk</h2>
+    <p>This is the BC-250 Command Center. It writes directly to low-level
+       hardware registers and firmware-level SMU settings &mdash; CPU/GPU
+       clock, voltage, and compute-unit routing. Incorrect values can crash
+       the system, cause instability, or in the case of CPU voltage/frequency
+       overclocking, permanently damage the hardware.</p>
+    <p>Be careful with changes. Know what a control does before you click it.</p>
+    <p>Not every BC-250 can unlock all 40 GPU compute units or all CPU cores
+       &mdash; most can, but it depends on the individual chip and isn't
+       guaranteed.</p>
+    <p class="fine">Every action here is logged and reversible via config
+       files &mdash; except physical hardware damage from CPU overvoltage,
+       which is not.</p>
+    <button onclick="document.body.classList.remove('gated'); document.getElementById('gate').style.display='none';">
+      I understand &mdash; proceed
+    </button>
+  </div>
+</div>
+<div id="credits" style="display:none; position:fixed; inset:0; background:rgba(6,7,10,0.88); backdrop-filter: blur(6px); z-index:100; align-items:center; justify-content:center; padding:2rem;">
+  <div class="box" style="max-width:520px; background:var(--panel-2); border:1px solid var(--border); border-radius:16px; padding:1.75rem; box-shadow:var(--shadow);">
+    <h2 style="margin:0 0 0.85rem 0; color:var(--text); font-size:1.05rem; font-weight:700;">About &mdash; BC-250 Command Center</h2>
+    <p style="font-size:0.82rem; line-height:1.6; margin:0 0 0.9rem 0; color:var(--muted);">
+      This app is a GUI wrapper. The actual unlock mechanisms were built by:
+    </p>
+    <ul id="credits-list" style="font-size:0.8rem; line-height:1.9; margin:0 0 0.9rem 0; padding-left:1.1rem; color:var(--text);"></ul>
+    <p style="font-size:0.72rem; color:var(--muted); margin:0 0 1rem 0;">Full details: CREDITS.md in the app folder. Links open in your regular browser.</p>
+    <button class="secondary" onclick="document.getElementById('credits').style.display='none'">&larr; Back</button>
+  </div>
+</div>
+<div class="topbar">
+  <div class="brand">
+    <span class="dot"></span>
+    <h1>BC-250 Command Center</h1>
+  </div>
+  <div class="btn-row" style="margin-top: 0;">
+    <button class="secondary" onclick="location.reload()" title="Reload the page">&#8635; Reload</button>
+    <button class="secondary" id="run-installer-btn" onclick="runInstaller()" style="display:none;" title="Sets up anything this app still needs on your computer. Opens a terminal window and asks for your password.">Run installer&hellip;</button>
+    <button class="secondary" onclick="document.getElementById('credits').style.display='flex'" title="About this app, and the projects/authors whose tools it uses.">About</button>
+  </div>
+</div>
+<div class="subtitle">CPU core unlock + GPU 40-CU unlock, live status and controls <span id="installer-msg"></span></div>
+<div class="subtitle" id="missing-note" style="display:none; margin-top:-0.5rem;"></div>
+
+<div class="grid">
+<div class="card">
+  <h2>CPU Cores</h2>
+  <div class="row">
+    <div>
+      <div class="stat" id="cpu-stat">-</div>
+      <div class="label">cores online</div>
+    </div>
+    <span class="pill" id="cpu-pill"></span>
+  </div>
+  <div class="btn-row">
+    <button id="cpu-unlock-btn" onclick="cpuUnlock()" title="Turns on the 2 extra CPU cores that are hidden by the factory. This usually already happens by itself when the computer starts up — use this button if it somehow didn't.">Unlock cores now</button>
+  </div>
+  <div class="btn-row">
+    <button class="secondary" id="cpu-stress-btn" onclick="cpuStressTest()" title="Runs your CPU at full power for 20 minutes straight to make sure the extra cores actually work properly. Doesn't change any settings, it just checks.">Stress test (20 min)</button>
+  </div>
+
+  <div class="row" style="margin-top: 0.5rem;">
+    <div>
+      <div class="stat" id="cpu-clock-stat" style="font-size:1.05rem;">-</div>
+      <div class="label">live clock (avg / min / max across cores)</div>
+    </div>
+  </div>
+
+  <hr class="divider">
+  <h2>CPU Auto-Overclock</h2>
+  <div id="cpu-oc-unavailable" class="preset-note" style="display:none;">Not installed yet — run the installer.</div>
+  <div id="cpu-oc-ui">
+    <div class="row" style="margin-top: 0;">
+      <div class="label">Current: <span id="oc-current-text">click Refresh</span></div>
+    </div>
+    <div class="btn-row">
+      <button class="secondary" onclick="cpuOcStatus()" title="Shows the CPU speed setting that's currently saved, if any.">Refresh</button>
+    </div>
+    <div class="btn-row">
+      <button onclick="cpuOcDetect()" id="oc-detect-btn" title="Automatically tries higher CPU speeds, testing stability at each step, and stops at the first sign of trouble. Takes a few minutes. Doesn't keep any change until you accept it below.">Auto</button>
+      <button class="secondary" onclick="cpuOcRevert()" title="Removes any CPU speed boost and goes back to the normal factory speed.">Revert to stock</button>
+    </div>
+    <div class="row" id="oc-result-row" style="display:none;">
+      <div class="label" id="oc-result-text"></div>
+      <button onclick="cpuOcApply()" title="Locks in the faster speed that was just found, and makes it come back automatically every time the computer starts.">Accept &amp; apply</button>
+    </div>
+  </div>
+  <div class="status-msg" id="cpu-msg"></div>
+</div>
+
+<div class="card">
+  <h2>GPU Compute Units</h2>
+  <div class="row">
+    <div>
+      <div class="stat" id="cu-stat">—</div>
+      <div class="label">CUs active &amp; routed &mdash; click Refresh (needs your password)</div>
+    </div>
+    <span class="pill" id="cu-pill"></span>
+  </div>
+  <div class="cu-grid" id="cu-grid"></div>
+  <div class="btn-row">
+    <button class="secondary" onclick="cuRefresh()" title="Checks how many of the graphics chip's 40 processing units are turned on right now.">Refresh status</button>
+  </div>
+  <div class="btn-row">
+    <button onclick="cuEnableAll()" id="cu-enable-btn" title="Turns on all 40 of the GPU's processing units instead of the normal 24, for better graphics/gaming performance. Automatically double-checks it actually works before keeping it, and undoes it if not. Keeps this setting every time the computer starts.">Enable all 40</button>
+    <button class="secondary" onclick="cuStock()" id="cu-stock-btn" title="Goes back to only 24 active GPU units, the normal factory setting.">Revert to stock 24</button>
+    <button class="secondary" onclick="gpuVerify()" title="Runs the same math test on the GPU by itself, any time you want to double-check it's still computing correctly. (Enable all 40 already runs this test automatically.)">Run correctness test</button>
+  </div>
+  <div class="status-msg" id="cu-msg"></div>
+</div>
+
+<div class="card">
+  <h2>GPU Clock / Voltage</h2>
+  <div class="row">
+    <div>
+      <div class="stat" id="gpu-clock-stat">-</div>
+      <div class="label">live clock (edge <span id="gpu-temp">-</span>&deg;C, <span id="gpu-power">-</span>W)</div>
+    </div>
+  </div>
+  <div class="presets" id="presets"></div>
+  <hr class="divider">
+  <div class="field-row">
+    <div class="field-group">
+      <span class="label">Target (MHz)</span>
+      <input id="gpu-oc-target" type="number" value="2000" step="50" style="width:6em;">
+    </div>
+    <div class="field-group">
+      <span class="label">Stop at (&deg;C)</span>
+      <input id="gpu-oc-temp" type="number" value="90" step="1" style="width:5em;">
+    </div>
+  </div>
+  <div class="btn-row">
+    <button id="gpu-oc-btn" onclick="gpuAutoOc()" title="Gradually tries faster GPU speeds. Each one is held for several real minutes to actually heat up (not just a quick check), with a cooldown pause before the next, and stops as soon as it gets too hot - the last speed that held is what your specific cooling can handle. Can take 30-60+ minutes total. Updates the quick settings above with this board's real results when done - doesn't apply anything on its own.">Auto-search (slow, ~30-60+ min)</button>
+  </div>
+  <div class="status-msg" id="clock-msg"></div>
+</div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+
+// state: 'busy' | 'ok' | 'err' | '' (clear)
+function setStatus(id, state, text) {
+  const el = $(id);
+  text = (text || '').toString();
+  // Safety net: this is meant to be a short plain-language status line, not
+  // a log. If something backend-side ever crashes and returns a raw
+  // traceback instead of a clean message, don't let it flood the UI -
+  // truncate hard rather than dump it here.
+  if (text.length > 160) {
+    text = text.slice(0, 160) + '… (unexpected long error - check the app logs)';
+  }
+  const icon = state === 'busy' ? '<span class="spinner"></span>' : state === 'ok' ? '✓' : state === 'err' ? '✗' : '';
+  el.textContent = '';
+  if (icon) el.innerHTML = icon + ' ';
+  el.appendChild(document.createTextNode(text));
+  el.className = 'status-msg' + (state ? ' ' + state : '');
+}
+
+async function api(path, opts) {
+  const r = await fetch(path, opts);
+  return r.json();
+}
+
+async function refreshCpu() {
+  const d = await api('/api/cpu/status');
+  $('cpu-stat').textContent = d.online !== null ? `${d.online} / ${d.expected}` : '?';
+  const pill = $('cpu-pill');
+  pill.textContent = d.unlocked ? 'unlocked' : 'locked';
+  pill.className = 'pill ' + (d.unlocked ? 'safe' : 'untested');
+  $('cpu-unlock-btn').disabled = !!d.unlocked;
+  $('cpu-unlock-btn').textContent = d.unlocked ? 'Re-run unlock now' : 'Unlock cores now';
+
+  const c = await api('/api/cpu/clocks');
+  $('cpu-clock-stat').textContent = c.avg
+    ? `${c.avg} MHz  (${Math.round(c.min)}-${Math.round(c.max)})`
+    : '-';
+}
+
+async function cpuUnlock() {
+  const btn = $('cpu-unlock-btn');
+  btn.disabled = true;
+  setStatus('cpu-msg', 'busy', 'Unlocking...');
+  const d = await api('/api/cpu/unlock', {method: 'POST'});
+  if (d.ok) {
+    const rebootNeeded = /REBOOT REQUIRED/i.test(d.output || '');
+    setStatus('cpu-msg', 'ok', rebootNeeded ? 'Unlocked - reboot required' : 'Already unlocked');
+  } else {
+    setStatus('cpu-msg', 'err', d.error || 'Failed');
+  }
+  await refreshCpu();
+}
+
+async function cpuStressTest() {
+  if (!confirm('Run a 20-minute CPU stress test to validate the unlocked cores? This maxes out all cores for the full duration - the machine will be fully loaded until it finishes.')) {
+    return;
+  }
+  const btn = $('cpu-stress-btn');
+  btn.disabled = true;
+  setStatus('cpu-msg', 'busy', 'Stress testing all cores for 20 minutes...');
+  const d = await api('/api/cpu/stresstest', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({minutes: 20})
+  });
+  btn.disabled = false;
+  if (d.ok) {
+    setStatus('cpu-msg', 'ok', `Stable - ${d.passed}/${d.cores} cores passed, 0 failed`);
+  } else if (d.failed) {
+    setStatus('cpu-msg', 'err', `${d.failed} core(s) failed the stress test`);
+  } else {
+    setStatus('cpu-msg', 'err', d.error || 'Stress test failed to run');
+  }
+}
+
+async function cuRefresh() {
+  $('cu-stat').innerHTML = '<span class="spinner"></span>';
+  const d = await api('/api/gpu/cu/status');
+  if (d.summary) {
+    $('cu-stat').textContent = `${d.summary.active} / ${d.summary.total}`;
+    const pill = $('cu-pill');
+    const full = d.summary.active === d.summary.total;
+    pill.textContent = full ? '40-CU unlocked' : 'stock';
+    pill.className = 'pill ' + (full ? 'safe' : 'untested');
+    $('cu-enable-btn').disabled = full;
+    $('cu-stock-btn').disabled = d.summary.active === 24;
+    const grid = $('cu-grid');
+    grid.innerHTML = '';
+    for (let i = 0; i < d.summary.total; i++) {
+      const cell = document.createElement('div');
+      cell.className = 'cu-cell' + (i < d.summary.active ? ' on' : '');
+      grid.appendChild(cell);
+    }
+  } else {
+    $('cu-stat').textContent = 'error';
+    setStatus('cu-msg', 'err', d.error || 'Failed to read status');
+  }
+}
+
+async function cuEnableAll() {
+  setStatus('cu-msg', 'busy', 'Testing, enabling, and re-testing (a few seconds)...');
+  const d = await api('/api/gpu/cu/enable-all', {method: 'POST'});
+  if (d.ok) {
+    setStatus('cu-msg', 'ok', 'Enabled all 40 CUs - correctness test passed');
+  } else if (d.failed_baseline) {
+    setStatus('cu-msg', 'err', 'Baseline test failed before touching anything - GPU/driver issue unrelated to the unlock. Nothing was changed.');
+  } else if (d.failed_verify) {
+    setStatus('cu-msg', 'err', "Correctness test failed after enabling - reverted to stock. This board's extra CUs may not be usable.");
+  } else {
+    setStatus('cu-msg', 'err', d.error || 'Failed');
+  }
+  await cuRefresh();
+}
+
+async function cuStock() {
+  setStatus('cu-msg', 'busy', 'Reverting to stock 24...');
+  const d = await api('/api/gpu/cu/stock', {method: 'POST'});
+  setStatus('cu-msg', d.ok ? 'ok' : 'err', d.ok ? 'Reverted to stock 24' : (d.error || 'Failed'));
+  await cuRefresh();
+}
+
+async function gpuVerify() {
+  setStatus('cu-msg', 'busy', 'Running correctness test...');
+  const d = await api('/api/gpu/verify', {method: 'POST'});
+  let text = d.passed ? 'Correctness test passed' : 'Correctness test failed';
+  const m = (d.output || '').match(/errors=(\d+)/);
+  if (!d.passed && m) text += ` (${m[1]} errors)`;
+  setStatus('cu-msg', d.passed ? 'ok' : 'err', text);
+}
+
+async function initCpuOc() {
+  const d = await api('/api/cpu/oc/available');
+  $('cpu-oc-unavailable').style.display = d.installed ? 'none' : 'block';
+  $('cpu-oc-ui').style.display = d.installed ? 'block' : 'none';
+}
+
+// Fixed, safe defaults - no user-typed frequency/voltage input at all.
+// These are the vendored tool's own documented ceiling (freq_max) and
+// default temp limit, not values a user can override from this UI.
+const CPU_OC_TARGET_MHZ = 4500;
+const CPU_OC_VID_LIMIT_MV = 1275;
+const CPU_OC_TEMP_LIMIT_C = 90;
+
+async function cpuOcDetect() {
+  if (!confirm(`Run the CPU auto-overclock search? It steps up from stock in 100MHz increments, stress-testing and measuring real voltage at each step, stopping at the first failure or at ${CPU_OC_TEMP_LIMIT_C}°C. This can take a couple minutes and carries real hardware risk if something in the underlying tool misbehaves.`)) {
+    return;
+  }
+  const btn = $('oc-detect-btn');
+  btn.disabled = true;
+  $('oc-result-row').style.display = 'none';
+  setStatus('cpu-msg', 'busy', `Searching up to ${CPU_OC_TARGET_MHZ}MHz (can take a couple minutes)...`);
+  const d = await api('/api/cpu/oc/detect', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({mhz: CPU_OC_TARGET_MHZ, mv: CPU_OC_VID_LIMIT_MV, temp: CPU_OC_TEMP_LIMIT_C})
+  });
+  btn.disabled = false;
+  if (d.result) {
+    $('oc-result-row').style.display = 'flex';
+    $('oc-result-text').textContent = `Found: ${d.result.mhz}MHz @ ~${d.result.measured_mv}mV (scale ${d.result.scale})`;
+    setStatus('cpu-msg', 'ok', 'Search complete');
+  } else if (d.aborted) {
+    setStatus('cpu-msg', 'err', 'Stopped early - stability/thermal limit reached');
+  } else {
+    setStatus('cpu-msg', 'err', d.error || 'Search failed');
+  }
+  await cpuOcStatus();
+}
+
+async function cpuOcStatus() {
+  const d = await api('/api/cpu/oc/status');
+  if (d.staged) {
+    $('oc-current-text').textContent = `${d.staged.mhz}MHz, scale ${d.staged.scale}, ${d.staged.temp}°C limit` + (d.persisted ? ' (persisted)' : ' (not applied)');
+  } else {
+    $('oc-current-text').textContent = 'stock (no overclock detected/applied)';
+  }
+  if (!d.ok) setStatus('cpu-msg', 'err', d.error || 'Status check failed');
+}
+
+async function cpuOcApply() {
+  if (!confirm('Apply this overclock now AND install it to reapply automatically on every boot?')) {
+    return;
+  }
+  setStatus('cpu-msg', 'busy', 'Applying and installing as a boot-persistent service...');
+  const d = await api('/api/cpu/oc/apply', {method: 'POST'});
+  setStatus('cpu-msg', d.ok ? 'ok' : 'err', d.ok ? 'Applied and persisted' : (d.error || 'Failed'));
+}
+
+async function cpuOcRevert() {
+  setStatus('cpu-msg', 'busy', 'Reverting to stock...');
+  const d = await api('/api/cpu/oc/revert', {method: 'POST'});
+  setStatus('cpu-msg', d.ok ? 'ok' : 'err', d.ok ? 'Reverted to stock' : (d.error || 'Failed'));
+  $('oc-result-row').style.display = 'none';
+}
+
+let currentConfig = {};
+
+async function refreshGpuTop() {
+  const [sensors, config] = await Promise.all([
+    api('/api/gpu/sensors'), api('/api/gpu/config')
+  ]);
+  $('gpu-temp').textContent = sensors.edge_c ?? '-';
+  $('gpu-power').textContent = sensors.power_w ?? '-';
+  $('gpu-clock-stat').textContent = config.max_mhz ? `cap: ${config.max_mhz}MHz / ${config.max_mv}mV` : '-';
+  currentConfig = config;
+  renderPresets(config);
+}
+
+// "Quick settings" ladder: starts as just the one universal-safe baseline
+// the server sends, and gets replaced by a personalized ladder built from
+// this specific board's own Auto-search results once one has been run.
+// gpuOcLadderMem is the source of truth for the current page session -
+// updating the cards right after a search finishes must never depend on
+// localStorage actually working (WebKitGTK's storage behavior inside a
+// pywebview window isn't fully reliable, and a silently-failed write
+// there previously meant a completed search updated nothing on screen).
+// localStorage is attempted only as a bonus, so the ladder can also
+// survive a restart when it does work.
+let gpuOcLadderMem = null;
+
+function loadLadder() {
+  if (gpuOcLadderMem) return gpuOcLadderMem;
+  try {
+    const raw = localStorage.getItem('gpuOcLadder');
+    if (raw) { gpuOcLadderMem = JSON.parse(raw); return gpuOcLadderMem; }
+  } catch (e) {}
+  return null;
+}
+
+function saveLadder(ladder) {
+  gpuOcLadderMem = ladder;
+  try { localStorage.setItem('gpuOcLadder', JSON.stringify(ladder)); } catch (e) {}
+}
+
+function buildLadder(history, edge) {
+  const baseline = {mhz: 1500, mv: 900, label: '1500MHz / 900mV', risk: 'safe',
+    note: 'Broadly validated safe floor.'};
+  if (!history || history.length === 0) return [baseline];
+
+  const safeMax = history[history.length - 1];
+  const rungs = [baseline];
+
+  // Pick the tested step closest to the midpoint between baseline and the
+  // highest one that held, so this reflects an actually-tested point
+  // rather than an interpolated guess.
+  if (safeMax.mhz > baseline.mhz) {
+    const midTarget = (baseline.mhz + safeMax.mhz) / 2;
+    let mid = history[0];
+    for (const h of history) {
+      if (Math.abs(h.mhz - midTarget) < Math.abs(mid.mhz - midTarget)) mid = h;
+    }
+    if (mid.mhz > baseline.mhz && mid.mhz < safeMax.mhz) {
+      rungs.push({mhz: mid.mhz, mv: mid.mv, label: `${mid.mhz}MHz / ${mid.mv}mV`, risk: 'safe',
+        note: 'Held for a full heat-soak during Auto-search.'});
+    }
+  }
+
+  if (safeMax.mhz > baseline.mhz) {
+    rungs.push({mhz: safeMax.mhz, mv: safeMax.mv, label: `${safeMax.mhz}MHz / ${safeMax.mv}mV`, risk: 'safe',
+      note: "Highest point that held for a full heat-soak - Auto-search's recommended max."});
+  }
+
+  if (edge) {
+    rungs.push({mhz: edge.mhz, mv: edge.mv, label: `${edge.mhz}MHz / ${edge.mv}mV`, risk: 'hot',
+      note: 'Hit the temperature limit during Auto-search - the most it suggests going, at your own risk.'});
+  }
+
+  return rungs;
+}
+
+function renderPresets(config) {
+  const wrap = $('presets');
+  wrap.innerHTML = '';
+  if (!config.governor_available) {
+    wrap.innerHTML = '<div class="preset-note">No GPU governor service was detected on this machine at install time — clock/voltage control is unavailable.</div>';
+    return;
+  }
+  const ladder = loadLadder() || config.presets;
+  for (const p of ladder) {
+    const div = document.createElement('div');
+    const isCurrent = p.mhz === config.max_mhz && p.mv === config.max_mv;
+    div.className = 'preset' + (isCurrent ? ' current' : '');
+    div.title = `Click to set the GPU to this speed right away and keep it every time the computer starts.`;
+    div.innerHTML = `<div class="preset-label">${p.label} <span class="pill ${p.risk}">${p.risk}</span></div>
+      <div class="preset-note">${p.note}</div>`;
+    div.onclick = () => {
+      if (isCurrent) return;
+      if (confirm(`You're about to change the GPU clock speed to ${p.mhz}MHz / ${p.mv}mV. Are you sure?`)) {
+        setClock(p.mhz, p.mv);
+      }
+    };
+    wrap.appendChild(div);
+  }
+}
+
+async function gpuAutoOc() {
+  const target = parseInt($('gpu-oc-target').value, 10);
+  const temp = parseInt($('gpu-oc-temp').value, 10);
+  const btn = $('gpu-oc-btn');
+  btn.disabled = true;
+  setStatus('clock-msg', 'busy', `Searching up to ${target}MHz - real heat-soak per step plus cooldown between steps, can take 30-60+ minutes...`);
+  const d = await api('/api/gpu/autooc/search', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({target_mhz: target, temp_limit: temp})
+  });
+  btn.disabled = false;
+  if (d.result) {
+    saveLadder(buildLadder(d.history, d.edge));
+    setStatus('clock-msg', 'ok', `Search complete - quick settings below updated with this board's results (up to ${d.result.mhz}MHz).`);
+  } else if (d.aborted) {
+    setStatus('clock-msg', 'err', 'Stopped early - temperature limit reached before finding even one safe step above the baseline.');
+  } else {
+    setStatus('clock-msg', 'err', d.error || 'Search failed');
+  }
+  await refreshGpuTop();
+}
+
+async function setClock(mhz, mv) {
+  setStatus('clock-msg', 'busy', `Setting ${mhz}MHz / ${mv}mV...`);
+  const d = await api('/api/gpu/clock', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({mhz, mv})
+  });
+  setStatus('clock-msg', d.ok ? 'ok' : 'err', d.ok ? `Set to ${mhz}MHz / ${mv}mV` : (d.error || 'Failed'));
+  await refreshGpuTop();
+}
+
+async function checkMissing() {
+  const d = await api('/api/install/missing');
+  const btn = $('run-installer-btn');
+  const note = $('missing-note');
+  if (d.missing && d.missing.length) {
+    btn.style.display = 'inline-block';
+    note.style.display = 'block';
+    note.textContent = 'Missing: ' + d.missing.join(', ');
+  } else {
+    btn.style.display = 'none';
+    note.style.display = 'none';
+  }
+}
+
+async function runInstaller() {
+  const msg = $('installer-msg');
+  msg.textContent = '— opening terminal...';
+  const d = await api('/api/install/run', {method: 'POST'});
+  msg.textContent = d.ok ? `— opened in ${d.terminal}, finish it there then refresh this page` : `— error: ${d.error}`;
+}
+
+const CREDITS = [
+  {name: 'WinnieLV/bc250-cu-live-manager', note: 'GPU CU enable/disable', url: 'https://github.com/WinnieLV/bc250-cu-live-manager'},
+  {name: 'duggasco/bc250-40cu-unlock', note: 'GPU correctness test', url: 'https://github.com/duggasco/bc250-40cu-unlock'},
+  {name: 'bc250-collective/bc250_smu_oc', note: 'CPU auto-overclock', url: 'https://github.com/bc250-collective/bc250_smu_oc'},
+  {name: 'rw-r-r-0644/bc250-core-unlock', note: 'CPU core-unlock technique', url: 'https://github.com/rw-r-r-0644/bc250-core-unlock'},
+  {name: 'elektricM/amd-bc250-docs', note: 'community reference docs', url: 'https://github.com/elektricM/amd-bc250-docs'},
+];
+
+async function openCreditUrl(url) {
+  await api('/api/open-url', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({url})
+  });
+}
+
+function renderCredits() {
+  const ul = $('credits-list');
+  ul.innerHTML = '';
+  for (const c of CREDITS) {
+    const li = document.createElement('li');
+    li.innerHTML = `<b>${c.name}</b> &mdash; ${c.note} &mdash; <a href="#" style="color:var(--accent);">view on GitHub</a>`;
+    li.querySelector('a').onclick = (e) => { e.preventDefault(); openCreditUrl(c.url); };
+    ul.appendChild(li);
+  }
+}
+
+renderCredits();
+refreshCpu();
+refreshGpuTop();
+initCpuOc();
+checkMissing();
+setInterval(refreshCpu, 5000);
+setInterval(refreshGpuTop, 5000);
+</script>
+</body>
+</html>

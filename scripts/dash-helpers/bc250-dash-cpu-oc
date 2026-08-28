@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+# Root-only helper for the BC-250 dashboard: CPU auto-overclock via
+# bc250-collective/bc250_smu_oc (vendored, pip-installed into the
+# dashboard's own venv). Two-phase, matching the "search then accept"
+# flow: `detect` runs the tool's own auto-search WITHOUT --keep, so it
+# reverts to stock the moment the search ends - nothing stays applied
+# until `apply` is run as a separate, explicit step.
+set -euo pipefail
+
+CONF_FILE="/etc/bc250-dashboard.conf"
+[ -f "$CONF_FILE" ] || { echo "ERROR: $CONF_FILE not found - run install.sh first" >&2; exit 1; }
+source "$CONF_FILE"
+
+VENV_BIN="${PREFIX}/oc-venv/bin"
+STAGING_CONF="/etc/bc250-cpu-oc-detect.conf"
+
+if [ "$(id -u)" != "0" ]; then
+    echo "ERROR: must run as root" >&2
+    exit 1
+fi
+
+case "${1:-}" in
+    detect)
+        mhz="${2:-}"; mv_="${3:-}"; temp="${4:-90}"
+        if ! [[ "$mhz" =~ ^[0-9]+$ ]] || ! [[ "$mv_" =~ ^[0-9]+$ ]] || ! [[ "$temp" =~ ^[0-9]+$ ]]; then
+            echo "ERROR: usage: $0 detect <target-mhz> <target-mv> [temp-c]" >&2
+            exit 2
+        fi
+        # No --keep: reverts to stock automatically when the search ends.
+        "$VENV_BIN/bc250-detect" -f "$mhz" -v "$mv_" -t "$temp" -c "$STAGING_CONF"
+        ;;
+    status)
+        if [ -f "$STAGING_CONF" ]; then
+            echo "STAGED:"
+            cat "$STAGING_CONF"
+        else
+            echo "STAGED: none"
+        fi
+        if systemctl is-enabled bc250-smu-oc.service >/dev/null 2>&1; then
+            echo "PERSISTED: yes (bc250-smu-oc.service enabled)"
+            cat /etc/bc250-smu-oc.conf 2>/dev/null || true
+        else
+            echo "PERSISTED: no"
+        fi
+        ;;
+    apply)
+        [ -f "$STAGING_CONF" ] || { echo "ERROR: no detected config at $STAGING_CONF - run detect first" >&2; exit 1; }
+        "$VENV_BIN/bc250-apply" --apply "$STAGING_CONF"
+        "$VENV_BIN/bc250-apply" --install "$STAGING_CONF"
+        systemctl daemon-reload
+        systemctl enable bc250-smu-oc.service
+        echo "STATUS: applied live and installed as a boot-persistent service"
+        ;;
+    revert)
+        "$VENV_BIN/bc250-apply" --uninstall || true
+        echo "STATUS: removed persistent service (a reboot returns the CPU to stock; this session may still be at the last-applied clock until then)"
+        ;;
+    *)
+        echo "usage: $0 {detect MHZ MV [TEMP]|status|apply|revert}" >&2
+        exit 2
+        ;;
+esac

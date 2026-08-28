@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+# Root-only helper for the BC-250 dashboard: GPU CU enable/disable/status.
+#
+# enable-all follows a test-unlock-test sequence, same principle as the
+# CPU core unlock (which checks the core-presence mask BEFORE writing and
+# refuses if it looks like a genuine defect, not just market segmentation):
+#   1. Run the correctness test at the CURRENT (stock) config first. If the
+#      GPU can't even pass at stock, abort before touching CU routing at
+#      all - something's already wrong, unrelated to the unlock.
+#   2. Enable all 40 CUs live.
+#   3. Run the correctness test again. Only persist as the boot profile if
+#      it passes; if it fails, revert to stock and don't save.
+# Not every BC-250 board can actually run all 40 CUs correctly (silicon
+# variance, same as why some boards' extra CPU cores are genuinely
+# defective), so this has to be verified per-board, not assumed - and if
+# either test fails, the unlock is aborted rather than kept.
+set -euo pipefail
+
+LIVE_MGR="/usr/local/bin/bc250-cu-live-manager"
+CONF_FILE="/etc/bc250-dashboard.conf"
+[ -f "$CONF_FILE" ] || { echo "ERROR: $CONF_FILE not found - run install.sh first" >&2; exit 1; }
+source "$CONF_FILE"
+
+if [ "$(id -u)" != "0" ]; then
+    echo "ERROR: must run as root" >&2
+    exit 1
+fi
+
+case "${1:-}" in
+    status)
+        exec "$LIVE_MGR" status
+        ;;
+    enable-all)
+        echo "STATUS: running a baseline correctness test before touching anything..."
+        if ! "${PREFIX}/bc250-compute-verify.sh" 2>&1 | grep -q "errors=0 int_errors=0 fp_errors=0"; then
+            echo "STATUS: FAILED baseline test at the current (stock) configuration - aborting. Did not touch CU routing. Something is already wrong with this GPU/driver setup, unrelated to the 40-CU unlock." >&2
+            exit 1
+        fi
+        "$LIVE_MGR" --yes enable all
+        echo "STATUS: baseline passed, enabled live - running the correctness test again before saving this permanently..."
+        if "${PREFIX}/bc250-compute-verify.sh" 2>&1 | grep -q "errors=0 int_errors=0 fp_errors=0"; then
+            "$LIVE_MGR" --yes write-service-table
+            echo "STATUS: correctness test passed - 40 CUs enabled and saved as the boot profile"
+        else
+            "$LIVE_MGR" --yes stock-dispatch
+            "$LIVE_MGR" --yes write-service-table
+            echo "STATUS: FAILED correctness test after enabling - reverted to stock and did not save. Not every BC-250 board can run all 40 CUs; this one may not be able to." >&2
+            exit 1
+        fi
+        ;;
+    stock)
+        "$LIVE_MGR" --yes stock-dispatch
+        "$LIVE_MGR" --yes write-service-table
+        echo "STATUS: reverted to stock CU routing and saved as the boot profile"
+        ;;
+    *)
+        echo "usage: $0 {status|enable-all|stock}" >&2
+        exit 2
+        ;;
+esac
