@@ -1,9 +1,9 @@
 # BC-250 Command Center
 
-A portable GUI for unlocking and tuning the AMD BC-250 board (the repurposed
-Xbox Series S APU sold as a mini PC/dev board). Covers CPU core unlock, GPU
-compute-unit unlock, and CPU/GPU clock/voltage tuning — all through one
-desktop app, no manual terminal commands required after install.
+A portable GUI for unlocking and tuning the AMD BC-250 board. Covers CPU
+core unlock, GPU compute-unit unlock, and CPU/GPU clock/voltage tuning —
+all through one desktop app, no manual terminal commands required after
+install.
 
 Not every BC-250 can unlock all 40 GPU compute units or all 8 CPU cores —
 most can, but it depends on the individual chip. Every unlock and every
