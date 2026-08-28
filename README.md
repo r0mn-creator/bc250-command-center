@@ -10,6 +10,8 @@ most can, but it depends on the individual chip. Every unlock and every
 overclock/undervolt search in this app runs a real correctness test before
 keeping the change, and automatically reverts if that test fails.
 
+![BC-250 Command Center dashboard](screenshot.png)
+
 ## What it does
 
 - **CPU core unlock** — enables the 2 factory-disabled Zen 2 cores
