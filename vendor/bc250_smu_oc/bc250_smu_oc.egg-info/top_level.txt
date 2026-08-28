@@ -1,5 +1,0 @@
-bc250_apply
-bc250_detect
-bc250_limits
-bc250_smu
-stress_helper

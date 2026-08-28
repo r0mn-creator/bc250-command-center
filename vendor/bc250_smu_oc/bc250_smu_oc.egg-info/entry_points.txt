@@ -1,3 +1,0 @@
-[console_scripts]
-bc250-apply = bc250_apply:main
-bc250-detect = bc250_detect:main
