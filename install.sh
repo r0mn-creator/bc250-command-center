@@ -86,6 +86,8 @@ sudo cp "$HERE/vendor/bc250-compute-verify.sh" "$PREFIX/"
 sudo cp "$HERE/scripts/bc250-unlock-cores.py" "$PREFIX/"
 sudo cp "$HERE/scripts/bc250-auto-unlock.sh" "$PREFIX/"
 sudo cp "$HERE/scripts/gpu-autooc.py" "$PREFIX/"
+sudo cp "$HERE/scripts/gpu-undervolt.py" "$PREFIX/"
+sudo cp "$HERE/scripts/bc250-graphics-verify.sh" "$PREFIX/"
 sudo chmod 755 "$PREFIX"/*.sh "$PREFIX"/*.py
 
 sudo ln -sf "$PREFIX/bc250-cu-live-manager.sh" /usr/local/bin/bc250-cu-live-manager

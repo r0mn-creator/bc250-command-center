@@ -27,6 +27,7 @@ HELPER_GPU_CU = "/usr/local/bin/bc250-dash-gpu-cu"
 HELPER_GPU_CLOCK = "/usr/local/bin/bc250-dash-gpu-clock"
 HELPER_CPU_OC = "/usr/local/bin/bc250-dash-cpu-oc"
 HELPER_GPU_AUTOOC = "/usr/local/bin/bc250-dash-gpu-autooc"
+HELPER_GPU_UNDERVOLT = "/usr/local/bin/bc250-dash-gpu-undervolt"
 
 # Only the one broadly-validated universal floor is hardcoded. Everything
 # above this is specific to one board's cooling/silicon and shouldn't be
@@ -308,6 +309,42 @@ def gpu_autooc_search():
     return jsonify({
         "ok": rc == 0, "output": out.strip(), "error": err.strip(),
         "result": result, "aborted": aborted, "history": history, "edge": edge,
+    })
+
+
+@app.post("/api/gpu/undervolt/search")
+def gpu_undervolt_search():
+    if not GOVERNOR_CONFIGURED:
+        return jsonify({"ok": False, "error": "no governor service configured on this machine"}), 400
+    data = request.get_json(force=True)
+    mhz = str(int(data["mhz"]))
+    start_mv = str(int(data["start_mv"]))
+    mv_step = str(int(data.get("mv_step", 10)))
+    checks = str(int(data.get("checks_per_step", 3)))
+    temp = str(int(data.get("temp_limit", 90)))
+    # Each step now runs real Vulkan graphics-pipeline passes (not the old
+    # sub-second compute-only check) - about 20s per check on this hardware,
+    # so checks_per_step=3 over a full walk down to the voltage floor can
+    # run ~25 minutes. Generous timeout to match, with real margin above
+    # that worst case.
+    rc, out, err = pkexec(
+        HELPER_GPU_UNDERVOLT,
+        "--mhz", mhz, "--start-mv", start_mv, "--mv-step", mv_step,
+        "--checks-per-step", checks, "--temp-limit", temp,
+        timeout=3600,
+    )
+    result = None
+    m = re.search(r"Final Result:\s*(\d+)\s*MHz @ (\d+)\s*mV", out)
+    if m:
+        result = {"mhz": int(m.group(1)), "mv": int(m.group(2))}
+    failed = "Stopped at" in out or "no stable voltage found" in out
+    failure_reason = None
+    m = re.search(r"Stopped at \d+mV - (.+)", out)
+    if m:
+        failure_reason = m.group(1).strip()
+    return jsonify({
+        "ok": rc == 0, "output": out.strip(), "error": err.strip(),
+        "result": result, "failed": failed, "failure_reason": failure_reason,
     })
 
 

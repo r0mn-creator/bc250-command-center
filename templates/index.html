@@ -97,6 +97,12 @@
   .preset.current { border-left-color: var(--accent); background: rgba(109,140,255,0.06); }
   .preset-label { font-weight: 600; margin-bottom: 0.15rem; font-size: 0.78rem; display: flex; align-items: center; gap: 0.4rem; }
   .preset-note { color: var(--muted); font-size: 0.69rem; line-height: 1.4; }
+  .preset-undervolt-btn {
+    margin-top: 0.4rem; font-size: 0.65rem; padding: 0.25rem 0.55rem;
+    border: 1px solid var(--border); border-radius: var(--radius-sm);
+    background: transparent; color: var(--muted); cursor: pointer;
+  }
+  .preset-undervolt-btn:hover { border-color: var(--accent); color: var(--accent); }
   .presets { display: flex; flex-direction: column; gap: 0.45rem; margin-top: 0.55rem; overflow-y: auto; min-height: 0; }
 
   .status-msg {
@@ -553,16 +559,58 @@ function renderPresets(config) {
     const isCurrent = p.mhz === config.max_mhz && p.mv === config.max_mv;
     div.className = 'preset' + (isCurrent ? ' current' : '');
     div.title = `Click to set the GPU to this speed right away and keep it every time the computer starts.`;
+    // Undervolt search finds the lowest stable voltage AT this same clock
+    // (same performance, less power/heat) - only offered on entries that
+    // aren't already an undervolt result themselves, so the ladder doesn't
+    // fill up with "undervolt of an undervolt" noise.
+    const undervoltBtn = p.undervolted ? '' :
+      `<button type="button" class="preset-undervolt-btn" title="Hold ${p.mhz}MHz fixed and search for the lowest voltage - never below the safe baseline voltage - that still renders game-style graphics correctly - same speed, less power. Takes about 5-10 minutes.">Test undervolt</button>`;
     div.innerHTML = `<div class="preset-label">${p.label} <span class="pill ${p.risk}">${p.risk}</span></div>
-      <div class="preset-note">${p.note}</div>`;
+      <div class="preset-note">${p.note}</div>${undervoltBtn}`;
     div.onclick = () => {
       if (isCurrent) return;
       if (confirm(`You're about to change the GPU clock speed to ${p.mhz}MHz / ${p.mv}mV. Are you sure?`)) {
         setClock(p.mhz, p.mv);
       }
     };
+    if (!p.undervolted) {
+      div.querySelector('.preset-undervolt-btn').onclick = (ev) => {
+        ev.stopPropagation();
+        gpuUndervolt(p);
+      };
+    }
     wrap.appendChild(div);
   }
+}
+
+async function gpuUndervolt(p) {
+  if (!confirm(`Hold ${p.mhz}MHz fixed and search downward from ${p.mv}mV - never going below the safe baseline voltage - for the lowest voltage that still renders real game-style graphics correctly (not just a quick synthetic check). This can take about 5-10 minutes of testing. Continue?`)) {
+    return;
+  }
+  setStatus('clock-msg', 'busy', `Undervolt search at ${p.mhz}MHz starting from ${p.mv}mV - testing downward...`);
+  const d = await api('/api/gpu/undervolt/search', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({mhz: p.mhz, start_mv: p.mv})
+  });
+  if (d.result) {
+    const ladder = (loadLadder() || []).slice();
+    const already = ladder.some(r => r.mhz === d.result.mhz && r.mv === d.result.mv);
+    if (!already) {
+      ladder.push({
+        mhz: d.result.mhz, mv: d.result.mv,
+        label: `${d.result.mhz}MHz / ${d.result.mv}mV`,
+        risk: 'safe', undervolted: true,
+        note: `Undervolt of the ${p.mhz}MHz point - same speed as that entry, lowest voltage that still rendered real game-style graphics correctly.`,
+      });
+      saveLadder(ladder);
+    }
+    const verb = d.result.mv < p.mv ? 'Found' : 'Confirmed';
+    setStatus('clock-msg', 'ok', `${verb} ${d.result.mhz}MHz / ${d.result.mv}mV stable - added as a new quick setting below.`);
+    renderPresets(await api('/api/gpu/config'));
+  } else {
+    setStatus('clock-msg', 'err', d.failure_reason || d.error || 'Undervolt search failed to find any stable voltage.');
+  }
+  await refreshGpuTop();
 }
 
 async function gpuAutoOc() {
