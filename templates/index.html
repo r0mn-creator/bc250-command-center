@@ -89,14 +89,21 @@
   .field-group .label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.04em; }
 
   .preset {
+    position: relative;
     border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.55rem 0.7rem;
     cursor: pointer; transition: border-color 0.12s ease, background 0.12s ease;
     border-left: 3px solid var(--border);
   }
   .preset:hover { border-color: var(--muted-2); border-left-color: var(--accent); }
   .preset.current { border-left-color: var(--accent); background: rgba(109,140,255,0.06); }
-  .preset-label { font-weight: 600; margin-bottom: 0.15rem; font-size: 0.78rem; display: flex; align-items: center; gap: 0.4rem; }
+  .preset-label { font-weight: 600; margin-bottom: 0.15rem; font-size: 0.78rem; display: flex; align-items: center; gap: 0.4rem; padding-right: 1.1rem; }
   .preset-note { color: var(--muted); font-size: 0.69rem; line-height: 1.4; }
+  .preset-remove-btn {
+    position: absolute; top: 0.4rem; right: 0.5rem;
+    border: none; background: transparent; color: var(--muted);
+    font-size: 0.68rem; line-height: 1; cursor: pointer; padding: 0.15rem;
+  }
+  .preset-remove-btn:hover { color: var(--hot); }
   .preset-undervolt-btn {
     margin-top: 0.4rem; font-size: 0.65rem; padding: 0.25rem 0.55rem;
     border: 1px solid var(--border); border-radius: var(--radius-sm);
@@ -149,10 +156,15 @@
     <p>Not every BC-250 can unlock all 40 GPU compute units or all CPU cores
        &mdash; most can, but it depends on the individual chip and isn't
        guaranteed.</p>
+    <p>Reading live GPU compute-unit status needs root, so proceeding will
+       ask for your password once, right away, to show it &mdash; you can
+       cancel that prompt and still use the rest of the app. Every change
+       you make after that asks for your password again, separately, each
+       time.</p>
     <p class="fine">Every action here is logged and reversible via config
        files &mdash; except physical hardware damage from CPU overvoltage,
        which is not.</p>
-    <button onclick="document.body.classList.remove('gated'); document.getElementById('gate').style.display='none';">
+    <button onclick="document.body.classList.remove('gated'); document.getElementById('gate').style.display='none'; refreshCpu(); refreshGpuTop(); initCpuOc(); cuRefresh();">
       I understand &mdash; proceed
     </button>
   </div>
@@ -233,7 +245,7 @@
   <div class="row">
     <div>
       <div class="stat" id="cu-stat">—</div>
-      <div class="label">CUs active &amp; routed &mdash; click Refresh (needs your password)</div>
+      <div class="label">CUs active &amp; routed</div>
     </div>
     <span class="pill" id="cu-pill"></span>
   </div>
@@ -565,7 +577,13 @@ function renderPresets(config) {
     // fill up with "undervolt of an undervolt" noise.
     const undervoltBtn = p.undervolted ? '' :
       `<button type="button" class="preset-undervolt-btn" title="Hold ${p.mhz}MHz fixed and search for the lowest voltage - never below the safe baseline voltage - that still renders game-style graphics correctly - same speed, less power. Takes about 5-10 minutes.">Test undervolt</button>`;
-    div.innerHTML = `<div class="preset-label">${p.label} <span class="pill ${p.risk}">${p.risk}</span></div>
+    // The one broadly-validated preset the backend always supplies (see
+    // CLOCK_PRESETS in app.py) can't be removed - it's the fallback the
+    // ladder itself falls back to when nothing else has been saved yet.
+    const isDefault = config.presets.some(cp => cp.mhz === p.mhz && cp.mv === p.mv);
+    const removeBtn = isDefault ? '' :
+      `<button type="button" class="preset-remove-btn" title="Remove this quick setting">&#10060;</button>`;
+    div.innerHTML = `${removeBtn}<div class="preset-label">${p.label} <span class="pill ${p.risk}">${p.risk}</span></div>
       <div class="preset-note">${p.note}</div>${undervoltBtn}`;
     div.onclick = () => {
       if (isCurrent) return;
@@ -577,6 +595,16 @@ function renderPresets(config) {
       div.querySelector('.preset-undervolt-btn').onclick = (ev) => {
         ev.stopPropagation();
         gpuUndervolt(p);
+      };
+    }
+    if (!isDefault) {
+      div.querySelector('.preset-remove-btn').onclick = (ev) => {
+        ev.stopPropagation();
+        if (confirm('Are you sure you want to remove this quick setting?')) {
+          const remaining = ladder.filter(r => !(r.mhz === p.mhz && r.mv === p.mv));
+          saveLadder(remaining);
+          renderPresets(config);
+        }
       };
     }
     wrap.appendChild(div);
@@ -593,7 +621,14 @@ async function gpuUndervolt(p) {
     body: JSON.stringify({mhz: p.mhz, start_mv: p.mv})
   });
   if (d.result) {
-    const ladder = (loadLadder() || []).slice();
+    const config = await api('/api/gpu/config');
+    // Seed from the default preset(s), not empty, when nothing's been saved
+    // yet - otherwise a fresh install's very first action being an
+    // undervolt search (rather than Auto-search, which already seeds this
+    // via buildLadder) would save a ladder that's missing the default
+    // entry entirely, breaking the "the default is always there" guarantee
+    // the remove button above relies on.
+    const ladder = (loadLadder() || config.presets.slice()).slice();
     const already = ladder.some(r => r.mhz === d.result.mhz && r.mv === d.result.mv);
     if (!already) {
       ladder.push({
@@ -606,7 +641,7 @@ async function gpuUndervolt(p) {
     }
     const verb = d.result.mv < p.mv ? 'Found' : 'Confirmed';
     setStatus('clock-msg', 'ok', `${verb} ${d.result.mhz}MHz / ${d.result.mv}mV stable - added as a new quick setting below.`);
-    renderPresets(await api('/api/gpu/config'));
+    renderPresets(config);
   } else {
     setStatus('clock-msg', 'err', d.failure_reason || d.error || 'Undervolt search failed to find any stable voltage.');
   }
@@ -693,9 +728,6 @@ function renderCredits() {
 }
 
 renderCredits();
-refreshCpu();
-refreshGpuTop();
-initCpuOc();
 checkMissing();
 setInterval(refreshCpu, 5000);
 setInterval(refreshGpuTop, 5000);
