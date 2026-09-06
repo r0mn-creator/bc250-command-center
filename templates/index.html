@@ -214,7 +214,7 @@
   <div class="row" style="margin-top: 0.5rem;">
     <div>
       <div class="stat" id="cpu-clock-stat" style="font-size:1.05rem;">-</div>
-      <div class="label">live clock (avg / min / max across cores)</div>
+      <div class="label">live clock (avg / min / max across cores, <span id="cpu-temp">-</span>&deg;C)</div>
     </div>
   </div>
 
@@ -323,10 +323,11 @@ async function refreshCpu() {
   $('cpu-unlock-btn').disabled = !!d.unlocked;
   $('cpu-unlock-btn').textContent = d.unlocked ? 'Re-run unlock now' : 'Unlock cores now';
 
-  const c = await api('/api/cpu/clocks');
+  const [c, s] = await Promise.all([api('/api/cpu/clocks'), api('/api/cpu/sensors')]);
   $('cpu-clock-stat').textContent = c.avg
     ? `${c.avg} MHz  (${Math.round(c.min)}-${Math.round(c.max)})`
     : '-';
+  $('cpu-temp').textContent = s.temp_c ?? '-';
 }
 
 async function cpuUnlock() {

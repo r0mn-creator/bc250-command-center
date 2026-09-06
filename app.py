@@ -201,6 +201,17 @@ def cpu_clocks():
     })
 
 
+@app.get("/api/cpu/sensors")
+def cpu_sensors():
+    rc, out, err = run(["sensors"])
+    temp = None
+    if rc == 0:
+        m = re.search(r"Tctl:\s*\+?([0-9.]+)", out)
+        if m:
+            temp = float(m.group(1))
+    return jsonify({"temp_c": temp})
+
+
 @app.post("/api/cpu/unlock")
 def cpu_unlock():
     rc, out, err = pkexec(HELPER_CPU_UNLOCK)
