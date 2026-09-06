@@ -127,7 +127,9 @@ else
     sudo tee /etc/systemd/system/bc250-core-unlock.service > /dev/null <<EOF
 [Unit]
 Description=BC-250 auto core-unlock (checks core count, unlocks+reboots once if needed)
-$( [ -n "$GOVERNOR_SERVICE" ] && printf 'After=%s\nRequires=%s\n' "$GOVERNOR_SERVICE" "$GOVERNOR_SERVICE" )
+# Wants=, not Requires=: the script below stops the governor service itself,
+# and Requires= would propagate that stop back onto this unit and kill it mid-run.
+$( [ -n "$GOVERNOR_SERVICE" ] && printf 'After=%s\nWants=%s\n' "$GOVERNOR_SERVICE" "$GOVERNOR_SERVICE" )
 
 [Service]
 Type=oneshot
